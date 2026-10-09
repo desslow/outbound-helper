@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Outbound Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.6
-// @description  Упрощенная работа с возвратами.
+// @version      1.7
+// @description  Outbound Helper
 // @author       desslow
-// @match        https://*.ozon.ru/outbound*
+// @match        https://*.ozon.ru/*
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -16,14 +16,19 @@
     let lastSpokenCode = '';
     let isPlayingAudio = false;
     let isTransferringInProgress = false;
+    let hasAlertedSealedError = false;
     window._ozonAuthHeaders = null;
 
     const SOUND_ERROR = 'https://st.ozone.ru/s3/turbo-pvz-ui-bucket/mp3/error.mp3';
     const audioError = new Audio(SOUND_ERROR);
     audioError.preload = 'auto';
 
+    function isOutboundPage() {
+        return window.location.pathname.startsWith('/outbound');
+    }
+
     function isCarriageDetailsPage() {
-        if (!window.location.pathname.startsWith('/outbound')) return false;
+        if (!isOutboundPage()) return false;
         const params = new URLSearchParams(window.location.search);
         return params.get('type') === 'carriage';
     }
@@ -59,7 +64,7 @@
                     const data = JSON.parse(this.responseText);
                     if (typeof data.allContainersSealed === 'boolean') {
                         allContainersSealed = data.allContainersSealed;
-                        handleCourierCodeSecurity();
+                        if (isOutboundPage()) handleCourierCodeSecurity();
                     }
                 }
             } catch (e) {}
@@ -92,7 +97,7 @@
                 response.clone().json().then(data => {
                     if (typeof data.allContainersSealed === 'boolean') {
                         allContainersSealed = data.allContainersSealed;
-                        handleCourierCodeSecurity();
+                        if (isOutboundPage()) handleCourierCodeSecurity();
                     }
                 }).catch(() => {});
             }
@@ -261,12 +266,19 @@
 
     function handleCourierCodeSecurity() {
         const codeEl = findCourierCodeElement();
-        if (!codeEl) return;
+        if (!codeEl) {
+            hasAlertedSealedError = false;
+            return;
+        }
 
         if (!allContainersSealed) {
             codeEl.classList.add('smart-blur-courier');
-            showSealedErrorToast();
+            if (!hasAlertedSealedError) {
+                hasAlertedSealedError = true;
+                showSealedErrorToast();
+            }
         } else {
+            hasAlertedSealedError = false;
             codeEl.classList.remove('smart-blur-courier');
             const code = codeEl.textContent.trim();
             if (code.length === 4 && code !== lastSpokenCode) {
@@ -359,8 +371,6 @@
                 const requestedCount = parseInt(inputEl.value, 10) || 0;
                 const countToMove = Math.min(requestedCount, freshTotal);
 
-                console.log(`%c[Outbound Helper] Запуск перемещения: ${countToMove} уникальных тарников из ${freshTotal}`, 'color: #005bff; font-weight: bold;');
-
                 if (countToMove <= 0) {
                     isTransferringInProgress = false;
                     return;
@@ -392,10 +402,7 @@
 
                     if (moveBtn) {
                         clearInterval(checkMoveInterval);
-                        console.log('%c[Outbound Helper] Нажатие "Переместить":', 'color: #10b981; font-weight: bold;', moveBtn);
-
                         moveBtn.click();
-
                         btnEl.textContent = 'Готово!';
                         setTimeout(() => {
                             btnEl.disabled = false;
@@ -404,7 +411,6 @@
                         }, 1500);
                     } else if (attempts > 25) {
                         clearInterval(checkMoveInterval);
-                        console.warn('[Outbound Helper] Кнопка "Переместить" не появилась.');
                         btnEl.disabled = false;
                         isTransferringInProgress = false;
                         btnEl.textContent = `Переместить КТЯ (${freshTotal})`;
@@ -431,6 +437,7 @@
     });
 
     setInterval(() => {
+        if (!isOutboundPage()) return;
         handleCourierCodeSecurity();
         injectTareTransferControls();
     }, 400);
