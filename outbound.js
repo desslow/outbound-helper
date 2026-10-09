@@ -254,24 +254,21 @@
     function findCourierCodeElement() {
         if (!window.location.pathname.startsWith('/outbound')) return null;
 
-        const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="popup"], [class*="drawer"], [class*="popover"]');
-        if (!modal) return null;
+        const exactEl = document.querySelector('[class*="_courierCode_"]');
+        if (exactEl) return exactEl;
 
-        const modalText = modal.textContent.toLowerCase();
-        if (!modalText.includes('курьер') && !modalText.includes('код')) return null;
-
-        const potentialEls = Array.from(modal.querySelectorAll('div, span, p, h1, h2, h3'));
-        for (let el of potentialEls) {
-            if (el.children.length === 0) {
-                const text = el.textContent.trim();
-                if (/^\d{4}$/.test(text)) {
+        const dialog = document.querySelector('[class*="dialog__dialog"], [class*="_dialogWindow_"], [class*="window__window"]');
+        if (dialog && dialog.textContent.includes('курьер')) {
+            const candidates = Array.from(dialog.querySelectorAll('div, span, p'));
+            for (let el of candidates) {
+                if (el.children.length === 0 && /^\d{4}$/.test(el.textContent.trim())) {
                     return el;
                 }
             }
         }
+
         return null;
     }
-
 
     function handleCourierCodeSecurity() {
         if (!window.location.pathname.startsWith('/outbound')) return;
@@ -279,6 +276,7 @@
         const codeEl = findCourierCodeElement();
         if (!codeEl) {
             hasAlertedSealedError = false;
+            lastSpokenCode = '';
             return;
         }
 
