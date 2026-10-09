@@ -252,7 +252,15 @@
     }
 
     function findCourierCodeElement() {
-        const potentialEls = Array.from(document.querySelectorAll('div, span, p, h2, h3'));
+        if (!window.location.pathname.startsWith('/outbound')) return null;
+
+        const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="popup"], [class*="drawer"], [class*="popover"]');
+        if (!modal) return null;
+
+        const modalText = modal.textContent.toLowerCase();
+        if (!modalText.includes('курьер') && !modalText.includes('код')) return null;
+
+        const potentialEls = Array.from(modal.querySelectorAll('div, span, p, h1, h2, h3'));
         for (let el of potentialEls) {
             if (el.children.length === 0) {
                 const text = el.textContent.trim();
@@ -264,7 +272,10 @@
         return null;
     }
 
+
     function handleCourierCodeSecurity() {
+        if (!window.location.pathname.startsWith('/outbound')) return;
+
         const codeEl = findCourierCodeElement();
         if (!codeEl) {
             hasAlertedSealedError = false;
@@ -289,6 +300,7 @@
             }
         }
     }
+
 
     function getRightColumnSplitX() {
         const content = document.querySelector('._content_jbnnr_28') || document.querySelector('main') || document.body;
